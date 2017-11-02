@@ -13,87 +13,95 @@
  * served, eat, then leave
  */
 class Customer : public cpen333::thread::thread_object {
-  OrderQueue& queue_;
-  Menu& menu_;
-  int id_;
+    OrderQueue &queue_;
+    Menu &menu_;
+    int id_;
+    cpen333::thread::semaphore servev_;
 
- public:
-  /**
-   * Creates a customer
-   * @param id customer id
-   * @param menu menu for customer to order food from
-   * @param queue queue to place order into
-   */
-  Customer(int id, Menu& menu, OrderQueue& queue) :
-      id_(id), menu_(menu), queue_(queue) {}
+public:
+    /**
+     * Creates a customer
+     * @param id customer id
+     * @param menu menu for customer to order food from
+     * @param queue queue to place order into
+     */
+    Customer(int id, Menu &menu, OrderQueue &queue) :
+            id_(id), menu_(menu), queue_(queue), servev_(0) {}
 
-  /**
-   * Unique customer id
-   * @return customer id
-   */
-  int id() {
-    return id_;
-  }
-
-  /**
-   * Server customer an order
-   * @param order order that is complete
-   */
-  void serve(const Order& order) {
-
-    //==================================================
-    // TODO: Notify main method that order is ready
-    //==================================================
-
-  }
-
-  /**
-   * Main customer function
-   * @return 0 when complete
-   */
-  int main() {
-
-    safe_printf("Customer %d arrived\n", id_);
-
-    // randomly order a bunch of food
-    double cost = 0;
-    int items = 0;
-
-    srand((int)std::chrono::system_clock::now().time_since_epoch().count());
-
-    // appetizer
-    size_t s = menu_.appetizers().size();
-    if (s > 0) {
-      MenuItem appy = menu_.appetizers()[rand() % s];
-      cost += appy.price;
-      ++items;
-
-      safe_printf("Customer %d ordering the %s (%d)\n", id_, appy.item.c_str(), appy.id);
-      queue_.add({id_, appy.id});
+    /**
+     * Unique customer id
+     * @return customer id
+     */
+    int id() {
+        return id_;
     }
 
-    // main course
-    s = menu_.mains().size();
-    if (s > 0) {
-      MenuItem meal = menu_.mains()[rand() % s];
-      cost += meal.price;
-      ++items;
+    /**
+     * Server customer an order
+     * @param order order that is complete
+     */
+    void serve(const Order &order) {
 
-      safe_printf("Customer %d ordering the %s (%d)\n", id_, meal.item.c_str(), meal.id);
-      queue_.add({id_, meal.id});
+        //==================================================
+        // TODO: Notify main method that order is ready
+        //==================================================
+        safe_printf("Customer %d enjoying the %s\n", id_, order.item_id);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        safe_printf("Customer %d finished the %s\n", id_, order.item_id);
+        servev_.notify();
     }
 
-    //==================================================
-    // TODO: wait for meals to be served
-    //==================================================
+    /**
+     * Main customer function
+     * @return 0 when complete
+     */
+    int main() {
 
-    // stay for some time
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+        safe_printf("Customer %d arrived\n", id_);
 
-    safe_printf("Customer %d paying $%.2f and leaving.\n", id_, cost);
+        // randomly order a bunch of food
+        double cost = 0;
+        int items = 0;
 
-    return 0;
-  }
+        srand((int) std::chrono::system_clock::now().time_since_epoch().count());
+
+        // appetizer
+        size_t s = menu_.appetizers().size();
+        if (s > 0) {
+            MenuItem appy = menu_.appetizers()[rand() % s];
+            cost += appy.price;
+            ++items;
+
+            safe_printf("Customer %d ordering the %s (%d)\n", id_, appy.item.c_str(), appy.id);
+            queue_.add({id_, appy.id, false});
+        }
+
+        // main course
+        s = menu_.mains().size();
+        if (s > 0) {
+            MenuItem meal = menu_.mains()[rand() % s];
+            cost += meal.price;
+            ++items;
+
+            safe_printf("Customer %d ordering the %s (%d)\n", id_, meal.item.c_str(), meal.id);
+            queue_.add({id_, meal.id, false});
+        }
+
+        //==================================================
+        // TODO: wait for meals to be served
+        //==================================================
+
+        // stay for some time
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+
+        for(int i=0; i<items; i++){
+            servev_.wait();
+        }
+
+        safe_printf("Customer %d paying $%.2f and leaving.\n", id_, cost);
+
+        return 0;
+    }
 };
 
 #endif //LAB6_CUSTOMER_H
